@@ -1,0 +1,4 @@
+(executable
+ (public_name simple_task_scheduler)
+ (name main)
+ (libraries simple_task_scheduler))
