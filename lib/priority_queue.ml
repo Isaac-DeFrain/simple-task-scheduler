@@ -1,6 +1,5 @@
-[@@@warning "-32"]
-
 open! Base
+open! Math_ops
 
 let name = "Priority queue"
 
@@ -43,15 +42,18 @@ let has_right_child i t = get_right_child_idx i < t.size
 let has_parent i _ = get_parent_idx i >= 0
 
 (* child + parent items *)
-let left_child i t = t.items.(get_left_child_idx i)
+let left_child i t =
+  if not @@ has_left_child i t then None
+  else Some t.items.(get_left_child_idx i)
 
-let right_child i t = t.items.(get_right_child_idx i)
+let right_child i t =
+  if not @@ has_right_child i t then None
+  else Some t.items.(get_right_child_idx i)
 
-let parent i t = t.items.(get_parent_idx i)
+let parent i t =
+  if not @@ has_parent i t then None else Some t.items.(get_parent_idx i)
 
 (* maintenance *)
-let swap = Array.swap
-
 let default = (Task.empty, 0)
 
 let ensure_extra_capacity t =
@@ -69,48 +71,52 @@ let ensure_extra_capacity t =
 (* implementation *)
 let is_empty t = t.size = 0
 
-let peek t = if is_empty t then None else Some t.items.(t.size - 1)
+let peek t = if is_empty t then None else Some t.items.(0)
 
 let rec bubble_up x i t =
-  if has_parent i t then
-    let px = parent i t in
+  match parent i t with
+  | None -> ()
+  | Some px ->
     let pi = get_parent_idx i in
-    if Comparable_task.compare x px = -1 then (
-      swap t.items i pi;
+    if Comparable_task.compare x px = 1 then (
+      Array.swap t.items i pi;
       bubble_up x pi t)
-
-let log =
-  let rec aux acc pow n =
-    if n < 2 * acc then pow else aux (2 * acc) (pow + 1) n
-  in
-  aux 1 0
-
-let pow =
-  let rec aux acc b n = if n <= 0 then acc else aux (b * acc) b (n - 1) in
-  aux 1
-
-let max_sort t =
-  let start = pow 2 (log t.size) - 1 in
-  let stop = t.size - 1 in
-  if stop > start then
-    Array.sort ~pos:start ~len:(stop - start) t.items
-      ~compare:Comparable_task.compare
 
 let push x t =
   ensure_extra_capacity t;
   let i = t.size in
   t.size <- i + 1;
   t.items.(i) <- x;
-  bubble_up x i t;
-  max_sort t
+  bubble_up x i t
+
+let rec trickle_down x i t =
+  let open Comparable_task in
+  match (left_child i t, right_child i t) with
+  | None, None -> ()
+  | Some cl, None ->
+    if compare x cl < 1 then Array.swap t.items i @@ get_left_child_idx i
+  | Some cl, Some cr ->
+    if compare cl cr < 1 then (
+      if compare x cr < 1 then (
+        let cri = get_right_child_idx i in
+        Array.swap t.items i cri;
+        trickle_down x cri t))
+    else if compare x cl < 1 then (
+      let cli = get_left_child_idx i in
+      Array.swap t.items i cli;
+      trickle_down x cli t)
+  | _ -> assert false
 
 let pop t =
   if t.size = 0 then None
   else
+    let top = t.items.(0) in
     let x = t.items.(t.size - 1) in
+    t.items.(0) <- x;
     t.items.(t.size - 1) <- (Task.empty, 0);
     t.size <- t.size - 1;
-    Some x
+    trickle_down x 0 t;
+    Some top
 
 let create ~capacity =
   { capacity; size = 0; items = Array.create ~len:capacity default }

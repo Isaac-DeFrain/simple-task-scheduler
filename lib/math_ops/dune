@@ -1,0 +1,3 @@
+(library
+ (name math_ops)
+ (public_name simple_task_scheduler.math_ops))
